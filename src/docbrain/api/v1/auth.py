@@ -4,8 +4,9 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel, EmailStr, Field
 from sqlalchemy.orm import Session
 
-from docbrain.api.dependencies import get_app_settings, get_session
+from docbrain.api.dependencies import get_app_settings, get_current_user, get_session
 from docbrain.core.config import Settings
+from docbrain.identity.domain import User
 from docbrain.identity.passwords import PasswordService, WeakPasswordError
 from docbrain.identity.tokens import JwtTokenService
 from docbrain.identity.unit_of_work import SqlAlchemyIdentityUnitOfWork
@@ -45,6 +46,12 @@ class LoginResponse(BaseModel):
     token_type: str = "bearer"
     expires_at: str
     user_id: str
+
+
+class MeResponse(BaseModel):
+    user_id: str
+    email: str
+    display_name: str | None
 
 
 @router.post(
@@ -125,4 +132,15 @@ def login(
         access_token=result.access_token.value,
         expires_at=result.access_token.expires_at.isoformat(),
         user_id=str(result.user.id.value),
+    )
+
+
+@router.get("/me", response_model=MeResponse)
+def me(
+    current_user: Annotated[User, Depends(get_current_user)],
+) -> MeResponse:
+    return MeResponse(
+        user_id=str(current_user.id.value),
+        email=current_user.email,
+        display_name=current_user.display_name,
     )

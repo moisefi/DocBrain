@@ -25,6 +25,18 @@ def test_user_repository_adds_and_gets_user_by_email() -> None:
         assert repository.get_by_email("missing@example.com") is None
 
 
+def test_user_repository_gets_user_by_id() -> None:
+    with _session() as session:
+        repository = SqlAlchemyUserRepository(session)
+        user = User(UserId(uuid4()), "sergio@example.com", "Sergio")
+
+        repository.add(user)
+        session.commit()
+
+        assert repository.get_by_id(user.id) == user
+        assert repository.get_by_id(UserId(uuid4())) is None
+
+
 def test_password_credential_repository_adds_hash() -> None:
     with _session() as session:
         user = User(UserId(uuid4()), "sergio@example.com", "Sergio")

@@ -110,6 +110,55 @@ def test_login_endpoint_rejects_invalid_credentials() -> None:
     assert response.status_code == 401
 
 
+def test_me_endpoint_returns_authenticated_user() -> None:
+    client = _client()
+    client.post(
+        "/api/v1/auth/register",
+        json={
+            "email": "sergio@example.com",
+            "password": "correct horse battery staple",
+            "organization_name": "Acme",
+            "display_name": "Sergio",
+        },
+    )
+    login_response = client.post(
+        "/api/v1/auth/login",
+        json={
+            "email": "sergio@example.com",
+            "password": "correct horse battery staple",
+        },
+    )
+
+    response = client.get(
+        "/api/v1/auth/me",
+        headers={"Authorization": f"Bearer {login_response.json()['access_token']}"},
+    )
+
+    assert response.status_code == 200
+    assert response.json()["email"] == "sergio@example.com"
+    assert response.json()["display_name"] == "Sergio"
+
+
+def test_me_endpoint_rejects_missing_token() -> None:
+    client = _client()
+
+    response = client.get("/api/v1/auth/me")
+
+    assert response.status_code == 401
+    assert response.headers["www-authenticate"] == "Bearer"
+
+
+def test_me_endpoint_rejects_invalid_token() -> None:
+    client = _client()
+
+    response = client.get(
+        "/api/v1/auth/me",
+        headers={"Authorization": "Bearer invalid-token"},
+    )
+
+    assert response.status_code == 401
+
+
 def _client(
     session_factory: sessionmaker[Session] | None = None,
 ) -> TestClient:

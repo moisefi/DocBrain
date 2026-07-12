@@ -18,6 +18,12 @@ class SqlAlchemyUserRepository:
             return None
         return _user_from_model(model)
 
+    def get_by_id(self, user_id: UserId) -> User | None:
+        model = self._session.get(UserModel, user_id.value)
+        if model is None:
+            return None
+        return _user_from_model(model)
+
     def add(self, user: User) -> None:
         self._session.add(
             UserModel(
