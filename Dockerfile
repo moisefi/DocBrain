@@ -7,6 +7,8 @@ WORKDIR /app
 
 COPY pyproject.toml README.md ./
 COPY src ./src
+COPY alembic.ini ./
+COPY migrations ./migrations
 
 RUN python -m pip install --upgrade pip \
     && python -m pip install --no-cache-dir .
@@ -14,4 +16,3 @@ RUN python -m pip install --upgrade pip \
 EXPOSE 8000
 
 CMD ["uvicorn", "docbrain.main:app", "--host", "0.0.0.0", "--port", "8000"]
-

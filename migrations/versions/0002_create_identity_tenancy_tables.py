@@ -1,6 +1,6 @@
 """Create identity and tenancy tables.
 
-Revision ID: 0002_create_identity_tenancy_tables
+Revision ID: 0002_identity_tenancy
 Revises: 0001_enable_pgvector
 Create Date: 2026-07-12
 """
@@ -10,7 +10,7 @@ from collections.abc import Sequence
 import sqlalchemy as sa
 from alembic import op
 
-revision: str = "0002_create_identity_tenancy_tables"
+revision: str = "0002_identity_tenancy"
 down_revision: str | None = "0001_enable_pgvector"
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
