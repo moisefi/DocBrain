@@ -15,8 +15,13 @@ from docbrain.identity.use_cases import (
     EmailAlreadyRegisteredError,
     InvalidCredentialsError,
     InvalidOrganizationNameError,
+    InvalidRefreshTokenError,
     LoginCommand,
     LoginUseCase,
+    LogoutCommand,
+    LogoutUseCase,
+    RefreshSessionCommand,
+    RefreshSessionUseCase,
     RegisterUserCommand,
     RegisterUserUseCase,
 )
@@ -48,6 +53,14 @@ class LoginResponse(BaseModel):
     token_type: str = "bearer"
     expires_at: str
     user_id: str
+
+
+class RefreshRequest(BaseModel):
+    refresh_token: str = Field(min_length=1)
+
+
+class LogoutRequest(BaseModel):
+    refresh_token: str = Field(min_length=1)
 
 
 class MeResponse(BaseModel):
@@ -138,6 +151,53 @@ def login(
         expires_at=result.access_token.expires_at.isoformat(),
         user_id=str(result.user.id.value),
     )
+
+
+@router.post("/refresh", response_model=LoginResponse)
+def refresh(
+    request: RefreshRequest,
+    session: Annotated[Session, Depends(get_session)],
+    settings: Annotated[Settings, Depends(get_app_settings)],
+) -> LoginResponse:
+    def session_factory() -> Session:
+        return session
+
+    try:
+        with SqlAlchemyIdentityUnitOfWork(session_factory) as uow:
+            result = RefreshSessionUseCase(
+                users=uow.users,
+                refresh_tokens=uow.refresh_tokens,
+                token_service=JwtTokenService(settings),
+                refresh_token_service=RefreshTokenService(settings),
+            ).execute(RefreshSessionCommand(request.refresh_token))
+    except InvalidRefreshTokenError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid refresh token",
+        ) from exc
+
+    return LoginResponse(
+        access_token=result.access_token.value,
+        refresh_token=result.refresh_token.value,
+        expires_at=result.access_token.expires_at.isoformat(),
+        user_id=str(result.user.id.value),
+    )
+
+
+@router.post("/logout", status_code=status.HTTP_204_NO_CONTENT)
+def logout(
+    request: LogoutRequest,
+    session: Annotated[Session, Depends(get_session)],
+    settings: Annotated[Settings, Depends(get_app_settings)],
+) -> None:
+    def session_factory() -> Session:
+        return session
+
+    with SqlAlchemyIdentityUnitOfWork(session_factory) as uow:
+        LogoutUseCase(
+            refresh_tokens=uow.refresh_tokens,
+            refresh_token_service=RefreshTokenService(settings),
+        ).execute(LogoutCommand(request.refresh_token))
 
 
 @router.get("/me", response_model=MeResponse)

@@ -110,6 +110,100 @@ def test_login_endpoint_rejects_invalid_credentials() -> None:
     assert response.status_code == 401
 
 
+def test_refresh_endpoint_rotates_refresh_token() -> None:
+    client = _client()
+    client.post(
+        "/api/v1/auth/register",
+        json={
+            "email": "sergio@example.com",
+            "password": "correct horse battery staple",
+            "organization_name": "Acme",
+        },
+    )
+    login_response = client.post(
+        "/api/v1/auth/login",
+        json={
+            "email": "sergio@example.com",
+            "password": "correct horse battery staple",
+        },
+    )
+    old_refresh_token = login_response.json()["refresh_token"]
+
+    response = client.post(
+        "/api/v1/auth/refresh",
+        json={"refresh_token": old_refresh_token},
+    )
+
+    assert response.status_code == 200
+    assert response.json()["refresh_token"] != old_refresh_token
+    JwtTokenService(client.app.state.settings).verify_access_token(
+        response.json()["access_token"],
+    )
+
+
+def test_refresh_endpoint_rejects_reused_refresh_token() -> None:
+    client = _client()
+    client.post(
+        "/api/v1/auth/register",
+        json={
+            "email": "sergio@example.com",
+            "password": "correct horse battery staple",
+            "organization_name": "Acme",
+        },
+    )
+    login_response = client.post(
+        "/api/v1/auth/login",
+        json={
+            "email": "sergio@example.com",
+            "password": "correct horse battery staple",
+        },
+    )
+    refresh_token = login_response.json()["refresh_token"]
+    first_refresh = client.post(
+        "/api/v1/auth/refresh",
+        json={"refresh_token": refresh_token},
+    )
+    second_refresh = client.post(
+        "/api/v1/auth/refresh",
+        json={"refresh_token": refresh_token},
+    )
+
+    assert first_refresh.status_code == 200
+    assert second_refresh.status_code == 401
+
+
+def test_logout_endpoint_revokes_refresh_token_family() -> None:
+    client = _client()
+    client.post(
+        "/api/v1/auth/register",
+        json={
+            "email": "sergio@example.com",
+            "password": "correct horse battery staple",
+            "organization_name": "Acme",
+        },
+    )
+    login_response = client.post(
+        "/api/v1/auth/login",
+        json={
+            "email": "sergio@example.com",
+            "password": "correct horse battery staple",
+        },
+    )
+    refresh_token = login_response.json()["refresh_token"]
+
+    logout_response = client.post(
+        "/api/v1/auth/logout",
+        json={"refresh_token": refresh_token},
+    )
+    refresh_response = client.post(
+        "/api/v1/auth/refresh",
+        json={"refresh_token": refresh_token},
+    )
+
+    assert logout_response.status_code == 204
+    assert refresh_response.status_code == 401
+
+
 def test_me_endpoint_returns_authenticated_user() -> None:
     client = _client()
     client.post(
