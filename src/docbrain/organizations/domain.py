@@ -27,6 +27,14 @@ class OrganizationId:
 
 
 @dataclass(frozen=True, slots=True)
+class Organization:
+    id: OrganizationId
+    name: str
+    slug: str
+    is_active: bool = True
+
+
+@dataclass(frozen=True, slots=True)
 class Membership:
     user_id: UserId
     organization_id: OrganizationId
@@ -85,4 +93,3 @@ class PermissionDeniedError(TenancyError):
     def __init__(self, permission: str) -> None:
         super().__init__(f"Permission denied: {permission}")
         self.permission = permission
-
