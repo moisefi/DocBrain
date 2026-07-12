@@ -12,6 +12,7 @@ from docbrain.identity.models import (
     UserModel,
 )
 from docbrain.identity.passwords import PasswordHash
+from docbrain.identity.refresh_tokens import RefreshTokenRecord
 
 
 class SqlAlchemyUserRepository:
@@ -96,6 +97,24 @@ class SqlAlchemyRefreshTokenRepository:
     def get_by_hash(self, token_hash: str) -> RefreshTokenModel | None:
         return self._session.scalar(
             select(RefreshTokenModel).where(RefreshTokenModel.token_hash == token_hash),
+        )
+
+    def get_record_by_hash(self, token_hash: str) -> RefreshTokenRecord | None:
+        model = self.get_by_hash(token_hash)
+        if model is None:
+            return None
+        family = self._session.get(RefreshTokenFamilyModel, model.family_id)
+        if family is None:
+            return None
+        return RefreshTokenRecord(
+            token_id=model.id,
+            family_id=model.family_id,
+            user_id=UserId(model.user_id),
+            token_hash=model.token_hash,
+            expires_at=model.expires_at,
+            used_at=model.used_at,
+            revoked_at=model.revoked_at,
+            family_revoked_at=family.revoked_at,
         )
 
     def mark_used(self, token_id: UUID, replaced_by_token_id: UUID) -> None:

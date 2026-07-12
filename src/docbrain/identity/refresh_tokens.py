@@ -17,6 +17,18 @@ class RefreshToken:
     expires_at: datetime
 
 
+@dataclass(frozen=True, slots=True)
+class RefreshTokenRecord:
+    token_id: UUID
+    family_id: UUID
+    user_id: UserId
+    token_hash: str
+    expires_at: datetime
+    used_at: datetime | None
+    revoked_at: datetime | None
+    family_revoked_at: datetime | None
+
+
 class RefreshTokenService:
     def __init__(self, settings: Settings | None = None) -> None:
         self._settings = settings or get_settings()
@@ -35,4 +47,3 @@ class RefreshTokenService:
 
     def hash(self, token: str) -> str:
         return sha256(token.encode("utf-8")).hexdigest()
-

@@ -1,11 +1,15 @@
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import UTC, datetime
 from typing import Protocol
 from uuid import UUID, uuid4
 
 from docbrain.identity.domain import User, UserId
 from docbrain.identity.passwords import PasswordHash, PasswordService
-from docbrain.identity.refresh_tokens import RefreshToken, RefreshTokenService
+from docbrain.identity.refresh_tokens import (
+    RefreshToken,
+    RefreshTokenRecord,
+    RefreshTokenService,
+)
 from docbrain.identity.tokens import AccessToken, JwtTokenService
 from docbrain.organizations.domain import (
     Membership,
@@ -41,6 +45,14 @@ class RefreshTokenRepository(Protocol):
         token_hash: str,
         expires_at: datetime,
     ) -> None: ...
+
+    def get_record_by_hash(self, token_hash: str) -> RefreshTokenRecord | None: ...
+
+    def mark_used(self, token_id: UUID, replaced_by_token_id: UUID) -> None: ...
+
+    def revoke_token(self, token_id: UUID) -> None: ...
+
+    def revoke_family(self, family_id: UUID) -> None: ...
 
 
 class OrganizationRepository(Protocol):
@@ -207,3 +219,106 @@ class LoginUseCase:
 
 class InvalidCredentialsError(ValueError):
     """Raised when login credentials cannot authenticate a user."""
+
+
+@dataclass(frozen=True, slots=True)
+class RefreshSessionCommand:
+    refresh_token: str
+
+
+@dataclass(frozen=True, slots=True)
+class RefreshSessionResult:
+    user: User
+    access_token: AccessToken
+    refresh_token: RefreshToken
+
+
+class RefreshSessionUseCase:
+    def __init__(
+        self,
+        *,
+        users: UserRepository,
+        refresh_tokens: RefreshTokenRepository,
+        token_service: JwtTokenService,
+        refresh_token_service: RefreshTokenService,
+    ) -> None:
+        self._users = users
+        self._refresh_tokens = refresh_tokens
+        self._token_service = token_service
+        self._refresh_token_service = refresh_token_service
+
+    def execute(self, command: RefreshSessionCommand) -> RefreshSessionResult:
+        token_hash = self._refresh_token_service.hash(command.refresh_token)
+        record = self._refresh_tokens.get_record_by_hash(token_hash)
+        if record is None:
+            raise InvalidRefreshTokenError
+
+        if record.used_at is not None:
+            self._refresh_tokens.revoke_family(record.family_id)
+            raise InvalidRefreshTokenError
+
+        if not _refresh_record_is_valid(record):
+            raise InvalidRefreshTokenError
+
+        user = self._users.get_by_id(record.user_id)
+        if user is None or not user.is_active:
+            raise InvalidRefreshTokenError
+
+        new_refresh_token = self._refresh_token_service.issue(
+            user.id,
+            family_id=record.family_id,
+        )
+        self._refresh_tokens.add_token(
+            token_id=new_refresh_token.token_id,
+            family_id=new_refresh_token.family_id,
+            user_id=user.id,
+            token_hash=self._refresh_token_service.hash(new_refresh_token.value),
+            expires_at=new_refresh_token.expires_at,
+        )
+        self._refresh_tokens.mark_used(record.token_id, new_refresh_token.token_id)
+
+        return RefreshSessionResult(
+            user=user,
+            access_token=self._token_service.issue_access_token(user.id),
+            refresh_token=new_refresh_token,
+        )
+
+
+@dataclass(frozen=True, slots=True)
+class LogoutCommand:
+    refresh_token: str
+
+
+class LogoutUseCase:
+    def __init__(
+        self,
+        *,
+        refresh_tokens: RefreshTokenRepository,
+        refresh_token_service: RefreshTokenService,
+    ) -> None:
+        self._refresh_tokens = refresh_tokens
+        self._refresh_token_service = refresh_token_service
+
+    def execute(self, command: LogoutCommand) -> None:
+        token_hash = self._refresh_token_service.hash(command.refresh_token)
+        record = self._refresh_tokens.get_record_by_hash(token_hash)
+        if record is not None:
+            self._refresh_tokens.revoke_family(record.family_id)
+
+
+class InvalidRefreshTokenError(ValueError):
+    """Raised when a refresh token cannot be trusted."""
+
+
+def _refresh_record_is_valid(record: RefreshTokenRecord) -> bool:
+    return (
+        record.revoked_at is None
+        and record.family_revoked_at is None
+        and _as_utc(record.expires_at) > datetime.now(UTC)
+    )
+
+
+def _as_utc(value: datetime) -> datetime:
+    if value.tzinfo is None:
+        return value.replace(tzinfo=UTC)
+    return value.astimezone(UTC)
