@@ -8,6 +8,7 @@ from docbrain.api.dependencies import get_app_settings, get_current_user, get_se
 from docbrain.core.config import Settings
 from docbrain.identity.domain import User
 from docbrain.identity.passwords import PasswordService, WeakPasswordError
+from docbrain.identity.refresh_tokens import RefreshTokenService
 from docbrain.identity.tokens import JwtTokenService
 from docbrain.identity.unit_of_work import SqlAlchemyIdentityUnitOfWork
 from docbrain.identity.use_cases import (
@@ -43,6 +44,7 @@ class LoginRequest(BaseModel):
 
 class LoginResponse(BaseModel):
     access_token: str
+    refresh_token: str
     token_type: str = "bearer"
     expires_at: str
     user_id: str
@@ -114,8 +116,10 @@ def login(
             result = LoginUseCase(
                 users=uow.users,
                 password_credentials=uow.password_credentials,
+                refresh_tokens=uow.refresh_tokens,
                 password_service=PasswordService(),
                 token_service=JwtTokenService(settings),
+                refresh_token_service=RefreshTokenService(settings),
             ).execute(
                 LoginCommand(
                     email=str(request.email),
@@ -130,6 +134,7 @@ def login(
 
     return LoginResponse(
         access_token=result.access_token.value,
+        refresh_token=result.refresh_token.value,
         expires_at=result.access_token.expires_at.isoformat(),
         user_id=str(result.user.id.value),
     )

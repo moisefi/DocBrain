@@ -6,6 +6,7 @@ import pytest
 from docbrain.core.config import Settings
 from docbrain.identity.domain import User, UserId
 from docbrain.identity.passwords import PasswordHash, PasswordService
+from docbrain.identity.refresh_tokens import RefreshTokenService
 from docbrain.identity.tokens import JwtTokenService
 from docbrain.identity.use_cases import (
     InvalidCredentialsError,
@@ -24,8 +25,10 @@ def test_login_returns_access_token_for_valid_credentials() -> None:
     use_case = LoginUseCase(
         users=FakeUsers([user]),
         password_credentials=credentials,
+        refresh_tokens=FakeRefreshTokens(),
         password_service=password_service,
         token_service=_token_service(),
+        refresh_token_service=_refresh_token_service(),
     )
 
     result = use_case.execute(
@@ -37,6 +40,7 @@ def test_login_returns_access_token_for_valid_credentials() -> None:
 
     assert result.user == user
     assert result.access_token.value
+    assert result.refresh_token.value
 
 
 def test_login_rejects_unknown_email() -> None:
@@ -60,8 +64,10 @@ def test_login_rejects_wrong_password() -> None:
         password_credentials=FakePasswordCredentials(
             hashes={user.id: password_hash},
         ),
+        refresh_tokens=FakeRefreshTokens(),
         password_service=password_service,
         token_service=_token_service(),
+        refresh_token_service=_refresh_token_service(),
     )
 
     with pytest.raises(InvalidCredentialsError):
@@ -82,8 +88,10 @@ def test_login_rejects_inactive_user() -> None:
         password_credentials=FakePasswordCredentials(
             hashes={user.id: password_hash},
         ),
+        refresh_tokens=FakeRefreshTokens(),
         password_service=password_service,
         token_service=_token_service(),
+        refresh_token_service=_refresh_token_service(),
     )
 
     with pytest.raises(InvalidCredentialsError):
@@ -117,16 +125,44 @@ class FakePasswordCredentials:
         return self.hashes.get(user_id)
 
 
+@dataclass
+class FakeRefreshTokens:
+    families: list[object] = field(default_factory=list)
+    tokens: list[str] = field(default_factory=list)
+
+    def add_family(self, family_id: object, user_id: UserId) -> None:
+        self.families.append((family_id, user_id))
+
+    def add_token(
+        self,
+        *,
+        token_id: object,
+        family_id: object,
+        user_id: UserId,
+        token_hash: str,
+        expires_at: object,
+    ) -> None:
+        self.tokens.append(token_hash)
+
+
 def _use_case() -> LoginUseCase:
     return LoginUseCase(
         users=FakeUsers(),
         password_credentials=FakePasswordCredentials(),
+        refresh_tokens=FakeRefreshTokens(),
         password_service=PasswordService(),
         token_service=_token_service(),
+        refresh_token_service=_refresh_token_service(),
     )
 
 
 def _token_service() -> JwtTokenService:
     return JwtTokenService(
+        Settings(jwt_secret="test-secret-with-enough-length-32b"),
+    )
+
+
+def _refresh_token_service() -> RefreshTokenService:
+    return RefreshTokenService(
         Settings(jwt_secret="test-secret-with-enough-length-32b"),
     )

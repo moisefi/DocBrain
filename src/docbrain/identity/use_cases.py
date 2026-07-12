@@ -1,9 +1,11 @@
 from dataclasses import dataclass
+from datetime import datetime
 from typing import Protocol
-from uuid import uuid4
+from uuid import UUID, uuid4
 
 from docbrain.identity.domain import User, UserId
 from docbrain.identity.passwords import PasswordHash, PasswordService
+from docbrain.identity.refresh_tokens import RefreshToken, RefreshTokenService
 from docbrain.identity.tokens import AccessToken, JwtTokenService
 from docbrain.organizations.domain import (
     Membership,
@@ -25,6 +27,20 @@ class PasswordCredentialRepository(Protocol):
     def add(self, user_id: UserId, password_hash: PasswordHash) -> None: ...
 
     def get_by_user_id(self, user_id: UserId) -> PasswordHash | None: ...
+
+
+class RefreshTokenRepository(Protocol):
+    def add_family(self, family_id: UUID, user_id: UserId) -> None: ...
+
+    def add_token(
+        self,
+        *,
+        token_id: UUID,
+        family_id: UUID,
+        user_id: UserId,
+        token_hash: str,
+        expires_at: datetime,
+    ) -> None: ...
 
 
 class OrganizationRepository(Protocol):
@@ -138,6 +154,7 @@ class LoginCommand:
 class LoginResult:
     user: User
     access_token: AccessToken
+    refresh_token: RefreshToken
 
 
 class LoginUseCase:
@@ -146,13 +163,17 @@ class LoginUseCase:
         *,
         users: UserRepository,
         password_credentials: PasswordCredentialRepository,
+        refresh_tokens: RefreshTokenRepository,
         password_service: PasswordService,
         token_service: JwtTokenService,
+        refresh_token_service: RefreshTokenService,
     ) -> None:
         self._users = users
         self._password_credentials = password_credentials
+        self._refresh_tokens = refresh_tokens
         self._password_service = password_service
         self._token_service = token_service
+        self._refresh_token_service = refresh_token_service
 
     def execute(self, command: LoginCommand) -> LoginResult:
         email = _normalize_email(command.email)
@@ -167,9 +188,20 @@ class LoginUseCase:
         if not self._password_service.verify_password(command.password, password_hash):
             raise InvalidCredentialsError
 
+        refresh_token = self._refresh_token_service.issue(user.id)
+        self._refresh_tokens.add_family(refresh_token.family_id, user.id)
+        self._refresh_tokens.add_token(
+            token_id=refresh_token.token_id,
+            family_id=refresh_token.family_id,
+            user_id=user.id,
+            token_hash=self._refresh_token_service.hash(refresh_token.value),
+            expires_at=refresh_token.expires_at,
+        )
+
         return LoginResult(
             user=user,
             access_token=self._token_service.issue_access_token(user.id),
+            refresh_token=refresh_token,
         )
 
 

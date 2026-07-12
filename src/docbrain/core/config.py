@@ -21,6 +21,10 @@ class Settings(BaseSettings):
     )
     jwt_issuer: str = "docbrain"
     access_token_ttl_seconds: int = Field(default=900, ge=60, le=3600)
+    refresh_token_ttl_seconds: int = Field(
+        default=60 * 60 * 24 * 30,
+        ge=3600,
+    )
 
     database_url: str = "postgresql+psycopg://docbrain:docbrain@localhost:5432/docbrain"
     redis_url: str = "redis://localhost:6379/0"
