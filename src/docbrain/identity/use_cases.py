@@ -4,6 +4,7 @@ from uuid import uuid4
 
 from docbrain.identity.domain import User, UserId
 from docbrain.identity.passwords import PasswordHash, PasswordService
+from docbrain.identity.tokens import AccessToken, JwtTokenService
 from docbrain.organizations.domain import (
     Membership,
     Organization,
@@ -20,6 +21,8 @@ class UserRepository(Protocol):
 
 class PasswordCredentialRepository(Protocol):
     def add(self, user_id: UserId, password_hash: PasswordHash) -> None: ...
+
+    def get_by_user_id(self, user_id: UserId) -> PasswordHash | None: ...
 
 
 class OrganizationRepository(Protocol):
@@ -122,3 +125,51 @@ class InvalidEmailError(ValueError):
 class InvalidOrganizationNameError(ValueError):
     """Raised when an organization name cannot produce a usable slug."""
 
+
+@dataclass(frozen=True, slots=True)
+class LoginCommand:
+    email: str
+    password: str
+
+
+@dataclass(frozen=True, slots=True)
+class LoginResult:
+    user: User
+    access_token: AccessToken
+
+
+class LoginUseCase:
+    def __init__(
+        self,
+        *,
+        users: UserRepository,
+        password_credentials: PasswordCredentialRepository,
+        password_service: PasswordService,
+        token_service: JwtTokenService,
+    ) -> None:
+        self._users = users
+        self._password_credentials = password_credentials
+        self._password_service = password_service
+        self._token_service = token_service
+
+    def execute(self, command: LoginCommand) -> LoginResult:
+        email = _normalize_email(command.email)
+        user = self._users.get_by_email(email)
+        if user is None or not user.is_active:
+            raise InvalidCredentialsError
+
+        password_hash = self._password_credentials.get_by_user_id(user.id)
+        if password_hash is None:
+            raise InvalidCredentialsError
+
+        if not self._password_service.verify_password(command.password, password_hash):
+            raise InvalidCredentialsError
+
+        return LoginResult(
+            user=user,
+            access_token=self._token_service.issue_access_token(user.id),
+        )
+
+
+class InvalidCredentialsError(ValueError):
+    """Raised when login credentials cannot authenticate a user."""

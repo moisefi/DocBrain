@@ -41,6 +41,12 @@ class SqlAlchemyPasswordCredentialRepository:
             ),
         )
 
+    def get_by_user_id(self, user_id: UserId) -> PasswordHash | None:
+        model = self._session.get(PasswordCredentialModel, user_id.value)
+        if model is None:
+            return None
+        return PasswordHash(model.password_hash)
+
 
 def _user_from_model(model: UserModel) -> User:
     return User(
@@ -49,4 +55,3 @@ def _user_from_model(model: UserModel) -> User:
         display_name=model.display_name,
         is_active=model.is_active,
     )
-

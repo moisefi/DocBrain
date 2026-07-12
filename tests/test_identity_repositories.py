@@ -40,9 +40,20 @@ def test_password_credential_repository_adds_hash() -> None:
         assert credential.password_hash == "$argon2id$hash"
 
 
+def test_password_credential_repository_gets_hash_by_user_id() -> None:
+    with _session() as session:
+        user = User(UserId(uuid4()), "sergio@example.com", "Sergio")
+        SqlAlchemyUserRepository(session).add(user)
+        repository = SqlAlchemyPasswordCredentialRepository(session)
+        repository.add(user.id, PasswordHash("$argon2id$hash"))
+        session.commit()
+
+        assert repository.get_by_user_id(user.id) == PasswordHash("$argon2id$hash")
+        assert repository.get_by_user_id(UserId(uuid4())) is None
+
+
 def _session() -> Session:
     import_all_models()
     engine = create_engine("sqlite+pysqlite:///:memory:")
     Base.metadata.create_all(engine)
     return Session(engine)
-
