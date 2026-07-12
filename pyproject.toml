@@ -13,6 +13,7 @@ dependencies = [
     "argon2-cffi>=25.1.0",
     "fastapi>=0.116.0",
     "psycopg[binary]>=3.3.0",
+    "pyjwt>=2.10.0",
     "pydantic-settings>=2.10.0",
     "sqlalchemy>=2.0.45",
     "uvicorn[standard]>=0.35.0",

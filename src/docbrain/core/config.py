@@ -15,6 +15,12 @@ class Settings(BaseSettings):
     app_version: str = "0.1.0"
     environment: str = Field(default="local", min_length=1)
     enable_docs: bool = True
+    jwt_secret: str = Field(
+        default="change-me-in-production-with-32-bytes",
+        min_length=32,
+    )
+    jwt_issuer: str = "docbrain"
+    access_token_ttl_seconds: int = Field(default=900, ge=60, le=3600)
 
     database_url: str = "postgresql+psycopg://docbrain:docbrain@localhost:5432/docbrain"
     redis_url: str = "redis://localhost:6379/0"
@@ -25,4 +31,3 @@ class Settings(BaseSettings):
 @lru_cache
 def get_settings() -> Settings:
     return Settings()
-
