@@ -1,8 +1,16 @@
+from datetime import UTC, datetime
+from uuid import UUID
+
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from docbrain.identity.domain import User, UserId
-from docbrain.identity.models import PasswordCredentialModel, UserModel
+from docbrain.identity.models import (
+    PasswordCredentialModel,
+    RefreshTokenFamilyModel,
+    RefreshTokenModel,
+    UserModel,
+)
 from docbrain.identity.passwords import PasswordHash
 
 
@@ -52,6 +60,60 @@ class SqlAlchemyPasswordCredentialRepository:
         if model is None:
             return None
         return PasswordHash(model.password_hash)
+
+
+class SqlAlchemyRefreshTokenRepository:
+    def __init__(self, session: Session) -> None:
+        self._session = session
+
+    def add_family(self, family_id: UUID, user_id: UserId) -> None:
+        self._session.add(
+            RefreshTokenFamilyModel(
+                id=family_id,
+                user_id=user_id.value,
+            ),
+        )
+
+    def add_token(
+        self,
+        *,
+        token_id: UUID,
+        family_id: UUID,
+        user_id: UserId,
+        token_hash: str,
+        expires_at: datetime,
+    ) -> None:
+        self._session.add(
+            RefreshTokenModel(
+                id=token_id,
+                family_id=family_id,
+                user_id=user_id.value,
+                token_hash=token_hash,
+                expires_at=expires_at,
+            ),
+        )
+
+    def get_by_hash(self, token_hash: str) -> RefreshTokenModel | None:
+        return self._session.scalar(
+            select(RefreshTokenModel).where(RefreshTokenModel.token_hash == token_hash),
+        )
+
+    def mark_used(self, token_id: UUID, replaced_by_token_id: UUID) -> None:
+        model = self._session.get(RefreshTokenModel, token_id)
+        if model is None:
+            return
+        model.used_at = datetime.now(UTC)
+        model.replaced_by_token_id = replaced_by_token_id
+
+    def revoke_token(self, token_id: UUID) -> None:
+        model = self._session.get(RefreshTokenModel, token_id)
+        if model is not None:
+            model.revoked_at = datetime.now(UTC)
+
+    def revoke_family(self, family_id: UUID) -> None:
+        family = self._session.get(RefreshTokenFamilyModel, family_id)
+        if family is not None:
+            family.revoked_at = datetime.now(UTC)
 
 
 def _user_from_model(model: UserModel) -> User:

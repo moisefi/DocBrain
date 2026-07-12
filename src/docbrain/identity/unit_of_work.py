@@ -5,6 +5,7 @@ from sqlalchemy.orm import Session
 
 from docbrain.identity.repositories import (
     SqlAlchemyPasswordCredentialRepository,
+    SqlAlchemyRefreshTokenRepository,
     SqlAlchemyUserRepository,
 )
 from docbrain.organizations.repositories import (
@@ -23,6 +24,7 @@ class SqlAlchemyIdentityUnitOfWork:
         self.password_credentials = SqlAlchemyPasswordCredentialRepository(
             self.session,
         )
+        self.refresh_tokens = SqlAlchemyRefreshTokenRepository(self.session)
         self.organizations = SqlAlchemyOrganizationRepository(self.session)
         self.memberships = SqlAlchemyMembershipRepository(self.session)
         return self
@@ -38,4 +40,3 @@ class SqlAlchemyIdentityUnitOfWork:
         else:
             self.session.rollback()
         self.session.close()
-

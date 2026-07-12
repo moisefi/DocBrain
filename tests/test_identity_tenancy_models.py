@@ -7,7 +7,8 @@ def test_identity_and_tenancy_tables_are_registered() -> None:
     assert {
         "users",
         "password_credentials",
+        "refresh_token_families",
+        "refresh_tokens",
         "organizations",
         "memberships",
     }.issubset(Base.metadata.tables)
-
