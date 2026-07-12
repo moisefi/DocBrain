@@ -13,9 +13,8 @@ Docker Compose debe levantar los servicios necesarios para desarrollar el MVP:
 
 Comandos previstos:
 
-- `uv sync`
+- `python -m pip install -e ".[dev]"` hasta incorporar `uv`
 - `docker compose up -d`
-- `alembic upgrade head`
 - `pytest`
 - `ruff check .`
 - `mypy .`
@@ -75,4 +74,3 @@ Para el MVP:
 - Versionado o lifecycle policies en S3.
 - Separacion de buckets por entorno.
 - Politica de retencion para auditoria y usage events.
-

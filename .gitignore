@@ -7,6 +7,7 @@ __pycache__/
 .ruff_cache/
 .coverage
 htmlcov/
+*.egg-info/
 
 # Virtual environments
 .venv/
@@ -29,4 +30,3 @@ Thumbs.db
 # Local artifacts
 .tmp_zip_review/
 DocBrain_Professional_Docs_v2.zip
-

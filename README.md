@@ -20,7 +20,7 @@ observabilidad y evaluacion continua de calidad.
 
 ## Stack previsto
 
-- Python 3.13
+- Python 3.12+ local, Python 3.13 objetivo
 - FastAPI
 - SQLAlchemy 2
 - Pydantic v2
@@ -32,6 +32,25 @@ observabilidad y evaluacion continua de calidad.
 - OpenTelemetry + Prometheus
 - Docker Compose
 - Ruff, MyPy y Pytest
+
+## Desarrollo local
+
+```powershell
+python -m venv .venv
+.\.venv\Scripts\Activate.ps1
+python -m pip install -e ".[dev]"
+Copy-Item .env.example .env
+docker compose up -d postgres redis minio
+uvicorn docbrain.main:app --reload
+```
+
+Validaciones:
+
+```powershell
+ruff check .
+mypy
+pytest
+```
 
 ## MVP
 
@@ -58,4 +77,3 @@ flujo end-to-end robusto:
 - [Security](SECURITY.md)
 - [Deployment](docs/deployment.md)
 - [Roadmap](ROADMAP.md)
-
