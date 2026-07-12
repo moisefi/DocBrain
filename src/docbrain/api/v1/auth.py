@@ -4,12 +4,17 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel, EmailStr, Field
 from sqlalchemy.orm import Session
 
-from docbrain.api.dependencies import get_session
+from docbrain.api.dependencies import get_app_settings, get_session
+from docbrain.core.config import Settings
 from docbrain.identity.passwords import PasswordService, WeakPasswordError
+from docbrain.identity.tokens import JwtTokenService
 from docbrain.identity.unit_of_work import SqlAlchemyIdentityUnitOfWork
 from docbrain.identity.use_cases import (
     EmailAlreadyRegisteredError,
+    InvalidCredentialsError,
     InvalidOrganizationNameError,
+    LoginCommand,
+    LoginUseCase,
     RegisterUserCommand,
     RegisterUserUseCase,
 )
@@ -28,6 +33,18 @@ class RegisterResponse(BaseModel):
     user_id: str
     organization_id: str
     role: str
+
+
+class LoginRequest(BaseModel):
+    email: EmailStr
+    password: str = Field(min_length=1, max_length=256)
+
+
+class LoginResponse(BaseModel):
+    access_token: str
+    token_type: str = "bearer"
+    expires_at: str
+    user_id: str
 
 
 @router.post(
@@ -73,4 +90,39 @@ def register(
         user_id=str(result.user.id.value),
         organization_id=str(result.organization.id.value),
         role=result.membership.role.value,
+    )
+
+
+@router.post("/login", response_model=LoginResponse)
+def login(
+    request: LoginRequest,
+    session: Annotated[Session, Depends(get_session)],
+    settings: Annotated[Settings, Depends(get_app_settings)],
+) -> LoginResponse:
+    def session_factory() -> Session:
+        return session
+
+    try:
+        with SqlAlchemyIdentityUnitOfWork(session_factory) as uow:
+            result = LoginUseCase(
+                users=uow.users,
+                password_credentials=uow.password_credentials,
+                password_service=PasswordService(),
+                token_service=JwtTokenService(settings),
+            ).execute(
+                LoginCommand(
+                    email=str(request.email),
+                    password=request.password,
+                ),
+            )
+    except InvalidCredentialsError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid credentials",
+        ) from exc
+
+    return LoginResponse(
+        access_token=result.access_token.value,
+        expires_at=result.access_token.expires_at.isoformat(),
+        user_id=str(result.user.id.value),
     )

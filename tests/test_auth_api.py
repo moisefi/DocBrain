@@ -5,6 +5,7 @@ from sqlalchemy.pool import StaticPool
 
 from docbrain.db.base import Base, import_all_models
 from docbrain.identity.models import UserModel
+from docbrain.identity.tokens import JwtTokenService
 from docbrain.main import create_app
 
 
@@ -56,6 +57,57 @@ def test_register_endpoint_persists_normalized_email() -> None:
     assert response.status_code == 201
     with session_factory() as session:
         assert session.scalar(select(UserModel.email)) == "sergio@example.com"
+
+
+def test_login_endpoint_returns_access_token_for_valid_credentials() -> None:
+    client = _client()
+    register_response = client.post(
+        "/api/v1/auth/register",
+        json={
+            "email": "sergio@example.com",
+            "password": "correct horse battery staple",
+            "organization_name": "Acme",
+        },
+    )
+
+    response = client.post(
+        "/api/v1/auth/login",
+        json={
+            "email": "Sergio@Example.com",
+            "password": "correct horse battery staple",
+        },
+    )
+
+    body = response.json()
+    assert register_response.status_code == 201
+    assert response.status_code == 200
+    assert body["token_type"] == "bearer"
+    assert body["user_id"] == register_response.json()["user_id"]
+    JwtTokenService(client.app.state.settings).verify_access_token(
+        body["access_token"],
+    )
+
+
+def test_login_endpoint_rejects_invalid_credentials() -> None:
+    client = _client()
+    client.post(
+        "/api/v1/auth/register",
+        json={
+            "email": "sergio@example.com",
+            "password": "correct horse battery staple",
+            "organization_name": "Acme",
+        },
+    )
+
+    response = client.post(
+        "/api/v1/auth/login",
+        json={
+            "email": "sergio@example.com",
+            "password": "wrong horse battery staple",
+        },
+    )
+
+    assert response.status_code == 401
 
 
 def _client(
