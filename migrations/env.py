@@ -4,13 +4,14 @@ from alembic import context
 from sqlalchemy import engine_from_config, pool
 
 from docbrain.core.config import get_settings
-from docbrain.db.base import Base
+from docbrain.db.base import Base, import_all_models
 
 config = context.config
 
 if config.config_file_name is not None:
     fileConfig(config.config_file_name)
 
+import_all_models()
 target_metadata = Base.metadata
 
 
@@ -47,4 +48,3 @@ if context.is_offline_mode():
     run_migrations_offline()
 else:
     run_migrations_online()
-

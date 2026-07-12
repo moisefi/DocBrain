@@ -13,3 +13,7 @@ NAMING_CONVENTION = {
 class Base(DeclarativeBase):
     metadata = MetaData(naming_convention=NAMING_CONVENTION)
 
+
+def import_all_models() -> None:
+    import docbrain.identity.models  # noqa: F401
+    import docbrain.organizations.models  # noqa: F401
