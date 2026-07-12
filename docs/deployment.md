@@ -15,6 +15,7 @@ Comandos previstos:
 
 - `python -m pip install -e ".[dev]"` hasta incorporar `uv`
 - `docker compose up -d`
+- `alembic upgrade head`
 - `pytest`
 - `ruff check .`
 - `mypy .`

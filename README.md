@@ -41,6 +41,7 @@ python -m venv .venv
 python -m pip install -e ".[dev]"
 Copy-Item .env.example .env
 docker compose up -d postgres redis minio
+alembic upgrade head
 uvicorn docbrain.main:app --reload
 ```
 
@@ -50,6 +51,7 @@ Validaciones:
 ruff check .
 mypy
 pytest
+alembic upgrade head
 ```
 
 ## MVP

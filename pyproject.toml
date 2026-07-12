@@ -9,8 +9,11 @@ description = "Multi-tenant RAG backend for private business documentation."
 readme = "README.md"
 requires-python = ">=3.12,<3.14"
 dependencies = [
+    "alembic>=1.17.0",
     "fastapi>=0.116.0",
+    "psycopg[binary]>=3.3.0",
     "pydantic-settings>=2.10.0",
+    "sqlalchemy>=2.0.45",
     "uvicorn[standard]>=0.35.0",
 ]
 
@@ -50,4 +53,3 @@ mypy_path = "src"
 strict = true
 warn_unused_configs = true
 packages = ["docbrain"]
-

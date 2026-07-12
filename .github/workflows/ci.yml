@@ -11,6 +11,23 @@ jobs:
   quality:
     name: Lint, typecheck and test
     runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: pgvector/pgvector:pg17
+        env:
+          POSTGRES_DB: docbrain
+          POSTGRES_USER: docbrain
+          POSTGRES_PASSWORD: docbrain
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U docbrain -d docbrain"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+    env:
+      DATABASE_URL: postgresql+psycopg://docbrain:docbrain@localhost:5432/docbrain
 
     steps:
       - name: Checkout
@@ -31,6 +48,8 @@ jobs:
       - name: MyPy
         run: mypy
 
+      - name: Alembic migrations
+        run: alembic upgrade head
+
       - name: Pytest
         run: pytest
-
