@@ -2,6 +2,7 @@ from fastapi import FastAPI
 
 from docbrain.api.router import api_router
 from docbrain.core.config import Settings, get_settings
+from docbrain.db.session import create_database_engine, create_session_factory
 
 
 def create_app(settings: Settings | None = None) -> FastAPI:
@@ -15,9 +16,10 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         openapi_url="/openapi.json" if resolved_settings.enable_docs else None,
     )
     app.state.settings = resolved_settings
+    app.state.engine = create_database_engine(resolved_settings)
+    app.state.session_factory = create_session_factory(app.state.engine)
     app.include_router(api_router)
     return app
 
 
 app = create_app()
-
